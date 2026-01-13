@@ -18,7 +18,7 @@ config = configparser.ConfigParser()
 config.read(CONFIG_PATH, encoding="utf-8")
 
 # 检查是否使用代理
-USE_PROXY = config.getboolean("DEFAULT", "USE_PROXY", fallback=False)
+USE_PROXY = config.getboolean("bot", "USE_PROXY", fallback=False)
 
 # 获取代理配置
 PROXY = None

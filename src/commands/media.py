@@ -161,3 +161,99 @@ def setup_media_commands(client):
         
         embed.set_footer(text=f"数据保存在 collections/{interaction.user.id}.json")
         await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    # 表情搜索自动补全
+    async def emoji_autocomplete(interaction: discord.Interaction, current: str) -> list[discord.app_commands.Choice[str]]:
+        """自动补全表情名称"""
+        collection = load_collection(interaction.user.id)
+        emojis = collection.get("emojis", {})
+        
+        # 过滤匹配的表情
+        choices = []
+        for emoji_id, data in emojis.items():
+            name = data.get("name", "")
+            if current.lower() in name.lower():
+                choices.append(discord.app_commands.Choice(
+                    name=f":{name}:",
+                    value=emoji_id
+                ))
+                if len(choices) >= 25:  # Discord 限制最多 25 个选项
+                    break
+        return choices
+
+    @client.tree.command(name="search_emoji", description="搜索已收藏的表情")
+    @discord.app_commands.describe(name="输入表情名称进行搜索")
+    @discord.app_commands.autocomplete(name=emoji_autocomplete)
+    async def search_emoji_cmd(interaction: discord.Interaction, name: str):
+        """搜索表情并返回链接"""
+        collection = load_collection(interaction.user.id)
+        emojis = collection.get("emojis", {})
+        
+        # 通过 ID 查找
+        if name in emojis:
+            emoji = emojis[name]
+            await interaction.response.send_message(
+                f"**:{emoji['name']}:**\n```\n{emoji['url']}\n```",
+                ephemeral=True
+            )
+        else:
+            # 尝试通过名称模糊匹配
+            for emoji_id, data in emojis.items():
+                if data.get("name", "").lower() == name.lower().strip(":"):
+                    await interaction.response.send_message(
+                        f"**:{data['name']}:**\n```\n{data['url']}\n```",
+                        ephemeral=True
+                    )
+                    return
+            await interaction.response.send_message(
+                "❌ 未找到该表情，请检查名称或先收藏。",
+                ephemeral=True
+            )
+
+    # 贴纸搜索自动补全
+    async def sticker_autocomplete(interaction: discord.Interaction, current: str) -> list[discord.app_commands.Choice[str]]:
+        """自动补全贴纸名称"""
+        collection = load_collection(interaction.user.id)
+        stickers = collection.get("stickers", {})
+        
+        # 过滤匹配的贴纸
+        choices = []
+        for sticker_id, data in stickers.items():
+            name = data.get("name", "")
+            if current.lower() in name.lower():
+                choices.append(discord.app_commands.Choice(
+                    name=name,
+                    value=sticker_id
+                ))
+                if len(choices) >= 25:
+                    break
+        return choices
+
+    @client.tree.command(name="search_sticker", description="搜索已收藏的贴纸")
+    @discord.app_commands.describe(name="输入贴纸名称进行搜索")
+    @discord.app_commands.autocomplete(name=sticker_autocomplete)
+    async def search_sticker_cmd(interaction: discord.Interaction, name: str):
+        """搜索贴纸并返回链接"""
+        collection = load_collection(interaction.user.id)
+        stickers = collection.get("stickers", {})
+        
+        # 通过 ID 查找
+        if name in stickers:
+            sticker = stickers[name]
+            await interaction.response.send_message(
+                f"**{sticker['name']}**\n```\n{sticker['url']}\n```",
+                ephemeral=True
+            )
+        else:
+            # 尝试通过名称模糊匹配
+            for sticker_id, data in stickers.items():
+                if data.get("name", "").lower() == name.lower():
+                    await interaction.response.send_message(
+                        f"**{data['name']}**\n```\n{data['url']}\n```",
+                        ephemeral=True
+                    )
+                    return
+            await interaction.response.send_message(
+                "❌ 未找到该贴纸，请检查名称或先收藏。",
+                ephemeral=True
+            )
