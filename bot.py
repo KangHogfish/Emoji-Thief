@@ -4,6 +4,9 @@ Discord User App - 最小实现
 """
 
 import os
+import json
+import re
+from pathlib import Path
 import discord
 from discord import app_commands
 from dotenv import load_dotenv
@@ -18,6 +21,36 @@ PROXY = os.getenv("PROXY_URL", "http://127.0.0.1:7897")
 
 if not TOKEN:
     raise ValueError("请在 .env 文件中设置 DISCORD_TOKEN")
+
+# 用户配置文件路径
+CONFIG_FILE = Path(__file__).parent / "user_config.json"
+
+
+def load_config() -> dict:
+    """加载用户配置"""
+    if CONFIG_FILE.exists():
+        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
+
+def save_config(config: dict):
+    """保存用户配置"""
+    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+        json.dump(config, f, indent=2)
+
+
+def get_user_channel(user_id: int) -> int | None:
+    """获取用户配置的频道 ID"""
+    config = load_config()
+    return config.get(str(user_id), {}).get("channel_id")
+
+
+def set_user_channel(user_id: int, channel_id: int):
+    """设置用户的目标频道"""
+    config = load_config()
+    config[str(user_id)] = {"channel_id": channel_id}
+    save_config(config)
 
 
 class MyClient(discord.Client):
@@ -93,7 +126,6 @@ async def extract_media(interaction: discord.Interaction, message: discord.Messa
             links.append(f"🖼️ 缩略图: {embed.thumbnail.url}")
     
     # 提取自定义表情（使用正则匹配消息内容）
-    import re
     # 匹配 <:name:id> 或 <a:name:id>（动态表情）
     emoji_pattern = r'<(a?):(\w+):(\d+)>'
     for match in re.finditer(emoji_pattern, message.content):
@@ -116,6 +148,127 @@ async def extract_media(interaction: discord.Interaction, message: discord.Messa
     
     # 仅自己可见
     await interaction.response.send_message(content, ephemeral=True)
+
+
+@client.tree.command(name="set_channel", description="设置媒体链接发送的目标频道")
+@app_commands.describe(channel="选择要发送链接的目标频道")
+async def set_channel(interaction: discord.Interaction, channel: discord.TextChannel):
+    """设置用户的目标频道"""
+    set_user_channel(interaction.user.id, channel.id)
+    await interaction.response.send_message(
+        f"✅ 已设置目标频道为: **#{channel.name}** (ID: {channel.id})\n"
+        f"现在可以使用右键菜单「发送到我的频道」了！",
+        ephemeral=True
+    )
+
+
+@client.tree.command(name="my_channel", description="查看当前设置的目标频道")
+async def my_channel(interaction: discord.Interaction):
+    """查看用户当前设置的频道"""
+    channel_id = get_user_channel(interaction.user.id)
+    if channel_id:
+        channel = client.get_channel(channel_id)
+        if channel:
+            await interaction.response.send_message(
+                f"📌 当前目标频道: **#{channel.name}** (ID: {channel_id})",
+                ephemeral=True
+            )
+        else:
+            await interaction.response.send_message(
+                f"⚠️ 已配置频道 ID: {channel_id}，但无法访问该频道。",
+                ephemeral=True
+            )
+    else:
+        await interaction.response.send_message(
+            "❌ 尚未设置目标频道。请使用 `/set_channel` 命令设置。",
+            ephemeral=True
+        )
+
+
+def extract_media_links(message: discord.Message) -> list[str]:
+    """从消息中提取媒体链接"""
+    links = []
+    
+    # 提取附件
+    for attachment in message.attachments:
+        links.append(attachment.url)
+    
+    # 提取嵌入图片
+    for embed in message.embeds:
+        if embed.image:
+            links.append(embed.image.url)
+        if embed.thumbnail:
+            links.append(embed.thumbnail.url)
+    
+    # 提取自定义表情
+    emoji_pattern = r'<(a?):(\w+):(\d+)>'
+    for match in re.finditer(emoji_pattern, message.content):
+        animated = match.group(1) == 'a'
+        emoji_id = match.group(3)
+        ext = 'gif' if animated else 'png'
+        links.append(f"https://cdn.discordapp.com/emojis/{emoji_id}.{ext}")
+    
+    # 提取贴纸
+    for sticker in message.stickers:
+        links.append(sticker.url)
+    
+    return links
+
+
+@client.tree.context_menu(name="发送到我的频道")
+async def send_to_channel(interaction: discord.Interaction, message: discord.Message):
+    """将提取的媒体链接发送到用户配置的频道"""
+    # 检查用户是否已配置频道
+    channel_id = get_user_channel(interaction.user.id)
+    if not channel_id:
+        await interaction.response.send_message(
+            "❌ 请先使用 `/set_channel` 命令设置目标频道！",
+            ephemeral=True
+        )
+        return
+    
+    # 获取目标频道
+    channel = client.get_channel(channel_id)
+    if not channel:
+        await interaction.response.send_message(
+            f"❌ 无法访问频道 (ID: {channel_id})，请检查 Bot 权限或重新设置频道。",
+            ephemeral=True
+        )
+        return
+    
+    # 提取链接
+    links = extract_media_links(message)
+    
+    if not links:
+        await interaction.response.send_message(
+            "❌ 这条消息中没有找到图片、表情或贴纸。",
+            ephemeral=True
+        )
+        return
+    
+    # 构建并发送消息到目标频道
+    embed = discord.Embed(
+        title="📎 提取的媒体链接",
+        description=f"来自 {message.author.mention} 的消息",
+        color=discord.Color.green(),
+        url=message.jump_url
+    )
+    embed.add_field(name="原消息链接", value=f"[点击跳转]({message.jump_url})", inline=False)
+    embed.add_field(name="媒体链接", value="\n".join(links[:10]), inline=False)  # 限制10个
+    if len(links) > 10:
+        embed.set_footer(text=f"共 {len(links)} 个链接，仅显示前 10 个")
+    
+    try:
+        await channel.send(embed=embed)
+        await interaction.response.send_message(
+            f"✅ 已将 {len(links)} 个链接发送到 **#{channel.name}**",
+            ephemeral=True
+        )
+    except discord.Forbidden:
+        await interaction.response.send_message(
+            f"❌ 没有在 **#{channel.name}** 发送消息的权限！",
+            ephemeral=True
+        )
 
 
 if __name__ == "__main__":
