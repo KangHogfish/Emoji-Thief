@@ -5,6 +5,8 @@ services:
     restart: unless-stopped
     env_file:
       - .env
-    # 可选：挂载日志目录
-    # volumes:
-    #   - ./logs:/app/logs
+    volumes:
+      # 持久化收藏数据
+      - ./collections:/app/collections
+      # 持久化用户配置
+      - ./user_config.json:/app/user_config.json

@@ -12,12 +12,17 @@ ENV PYTHONUNBUFFERED=1
 RUN addgroup --system --gid 1001 botgroup && \
     adduser --system --uid 1001 --gid 1001 botuser
 
+# 创建数据目录并设置权限
+RUN mkdir -p /app/collections && chown -R botuser:botgroup /app
+
 # 复制依赖文件并安装
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # 复制源代码
 COPY bot.py .
+COPY config.ini .
+COPY src/ ./src/
 
 # 切换到非 root 用户
 USER botuser
