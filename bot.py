@@ -260,6 +260,8 @@ async def send_to_channel(interaction: discord.Interaction, message: discord.Mes
     
     try:
         await channel.send(embed=embed)
+        # 发送纯链接消息
+        await channel.send("\n".join(links))
         await interaction.response.send_message(
             f"✅ 已将 {len(links)} 个链接发送到 **#{channel.name}**",
             ephemeral=True
