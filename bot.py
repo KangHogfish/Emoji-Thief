@@ -7,12 +7,14 @@ import os
 import discord
 from discord import app_commands
 from dotenv import load_dotenv
+import aiohttp
 
 # 加载环境变量
 load_dotenv()
 
-# 获取 Token
+# 获取 Token 和代理配置
 TOKEN = os.getenv("DISCORD_TOKEN")
+PROXY = os.getenv("PROXY_URL", "http://127.0.0.1:7897")
 
 if not TOKEN:
     raise ValueError("请在 .env 文件中设置 DISCORD_TOKEN")
@@ -24,7 +26,12 @@ class MyClient(discord.Client):
     def __init__(self):
         # 设置 intents（用户应用通常不需要特权 intents）
         intents = discord.Intents.default()
-        super().__init__(intents=intents)
+        
+        # 配置代理
+        super().__init__(
+            intents=intents,
+            proxy=PROXY,
+        )
 
         # 创建命令树用于斜杠命令
         self.tree = app_commands.CommandTree(self)
@@ -67,6 +74,48 @@ async def info(interaction: discord.Interaction):
         name="延迟", value=f"{round(client.latency * 1000)}ms", inline=True
     )
     await interaction.response.send_message(embed=embed)
+
+
+@client.tree.context_menu(name="提取媒体链接")
+async def extract_media(interaction: discord.Interaction, message: discord.Message):
+    """从消息中提取图片、表情和贴纸链接"""
+    links = []
+    
+    # 提取附件（图片、视频等）
+    for attachment in message.attachments:
+        links.append(f"📎 附件: {attachment.url}")
+    
+    # 提取嵌入图片
+    for embed in message.embeds:
+        if embed.image:
+            links.append(f"🖼️ 嵌入图片: {embed.image.url}")
+        if embed.thumbnail:
+            links.append(f"🖼️ 缩略图: {embed.thumbnail.url}")
+    
+    # 提取自定义表情（使用正则匹配消息内容）
+    import re
+    # 匹配 <:name:id> 或 <a:name:id>（动态表情）
+    emoji_pattern = r'<(a?):(\w+):(\d+)>'
+    for match in re.finditer(emoji_pattern, message.content):
+        animated = match.group(1) == 'a'
+        name = match.group(2)
+        emoji_id = match.group(3)
+        ext = 'gif' if animated else 'png'
+        url = f"https://cdn.discordapp.com/emojis/{emoji_id}.{ext}"
+        links.append(f"😀 表情 :{name}:: {url}")
+    
+    # 提取贴纸
+    for sticker in message.stickers:
+        links.append(f"🏷️ 贴纸 {sticker.name}: {sticker.url}")
+    
+    # 构建响应
+    if links:
+        content = "**找到以下媒体链接：**\n" + "\n".join(links)
+    else:
+        content = "❌ 这条消息中没有找到图片、表情或贴纸。"
+    
+    # 仅自己可见
+    await interaction.response.send_message(content, ephemeral=True)
 
 
 if __name__ == "__main__":
