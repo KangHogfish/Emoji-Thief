@@ -3,8 +3,6 @@ Discord 客户端模块
 """
 
 import os
-import configparser
-from pathlib import Path
 import discord
 from discord import app_commands
 from dotenv import load_dotenv
@@ -12,20 +10,15 @@ from dotenv import load_dotenv
 # 加载环境变量
 load_dotenv()
 
-# 加载配置文件
-CONFIG_PATH = Path(__file__).parent.parent / "config.ini"
-config = configparser.ConfigParser()
-config.read(CONFIG_PATH, encoding="utf-8")
-
-# 检查是否使用代理
-USE_PROXY = config.getboolean("bot", "USE_PROXY", fallback=False)
+# 检查是否使用代理（从 .env 读取）
+USE_PROXY = os.getenv("USE_PROXY", "false").lower() == "true"
 
 # 获取代理配置
 PROXY = None
 if USE_PROXY:
     PROXY = os.getenv("PROXY_URL")
     if not PROXY:
-        raise ValueError("config.ini 中启用了 USE_PROXY，但未在 .env 中设置 PROXY_URL")
+        raise ValueError("USE_PROXY=true，但未设置 PROXY_URL")
 
 
 class MyClient(discord.Client):
