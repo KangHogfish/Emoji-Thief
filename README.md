@@ -1,62 +1,78 @@
-# Discord User App
+# Discord Emoji Thief
 
-基于 discord.py 的 Discord 用户应用最小实现。
+一个 Discord User App，用于提取和收藏消息中的表情、贴纸和图片链接。
 
 ## 功能
 
-- `/ping` - 测试 Bot 响应和延迟
-- `/info` - 显示 Bot 信息
+### 右键菜单
+- **提取媒体链接** - 提取消息中的图片、表情、贴纸链接（仅自己可见）
+- **发送到我的频道** - 提取链接并发送到指定频道，同时自动收藏表情/贴纸
+
+### 斜杠命令
+| 命令 | 说明 |
+|------|------|
+| `/ping` | 测试 Bot 响应 |
+| `/info` | 查看 Bot 信息 |
+| `/set_channel` | 设置媒体发送的目标频道 |
+| `/my_channel` | 查看当前设置的频道 |
+| `/my_collection` | 查看已收藏的表情和贴纸 |
+| `/search_emoji` | 搜索收藏（支持自动补全） |
 
 ## 快速开始
 
 ### 1. 创建 Discord 应用
 
 1. 访问 [Discord Developer Portal](https://discord.com/developers/applications)
-2. 点击 "New Application" 创建应用
-3. 在 "Installation" 页面配置安装设置（选择 User Install）
-4. 在 "Bot" 页面获取 Token
+2. 创建应用，在 **Installation** 配置 User Install
+3. 在 **Bot** 页面获取 Token
 
-### 2. 配置环境
+### 2. 配置
 
 ```bash
-# 复制环境变量模板
+# 复制配置文件
 cp .env.example .env
+# 编辑 .env，填入 Token 和代理地址（如需）
 
-# 编辑 .env 文件，填入你的 Token
+# 编辑 config.ini 配置是否使用代理
 ```
 
-### 3. 运行
-
-**本地运行：**
+### 3. 本地运行
 
 ```bash
-# 安装依赖
 pip install -r requirements.txt
-
-# 启动 Bot
 python bot.py
 ```
 
-**Docker 运行：**
+### 4. Docker 部署
 
 ```bash
-# 构建并启动
-docker-compose up -d
-
-# 查看日志
-docker-compose logs -f
+docker-compose up -d --build
 ```
 
 ## 项目结构
 
 ```
 dcbot/
-├── bot.py              # 主程序
-├── requirements.txt    # Python 依赖
-├── .env.example        # 环境变量模板
-├── Dockerfile          # Docker 镜像
-└── docker-compose.yml  # 容器编排
+├── bot.py              # 入口文件
+├── config.ini          # 应用配置
+├── requirements.txt    # 依赖
+├── Dockerfile
+├── docker-compose.yml
+└── src/
+    ├── client.py       # Discord 客户端
+    ├── config.py       # 用户配置管理
+    ├── collection.py   # 表情/贴纸收藏
+    ├── utils.py        # 工具函数
+    └── commands/       # 命令模块
+        ├── basic.py
+        ├── channel.py
+        └── media.py
 ```
+
+## 数据存储
+
+- `user_config.json` - 用户频道配置
+- `collections/{用户ID}.json` - 用户收藏（按用户分文件）
 
 ## License
 
