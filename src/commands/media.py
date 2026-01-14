@@ -15,18 +15,22 @@ def setup_media_commands(client):
     @client.tree.context_menu(name="提取媒体链接")
     async def extract_media(interaction: discord.Interaction, message: discord.Message):
         """从消息中提取图片、表情和贴纸链接"""
-        links = []
+        results = []
+        urls = []
         
         # 提取附件（图片、视频等）
         for attachment in message.attachments:
-            links.append(f"📎 附件: {attachment.url}")
+            results.append(f"📎 附件")
+            urls.append(attachment.url)
         
         # 提取嵌入图片
         for embed in message.embeds:
             if embed.image:
-                links.append(f"🖼️ 嵌入图片: {embed.image.url}")
+                results.append(f"🖼️ 嵌入图片")
+                urls.append(embed.image.url)
             if embed.thumbnail:
-                links.append(f"🖼️ 缩略图: {embed.thumbnail.url}")
+                results.append(f"🖼️ 缩略图")
+                urls.append(embed.thumbnail.url)
         
         # 提取自定义表情（使用正则匹配消息内容）
         emoji_pattern = r'<(a?):(\w+):(\d+)>'
@@ -36,15 +40,19 @@ def setup_media_commands(client):
             emoji_id = match.group(3)
             ext = 'gif' if animated else 'png'
             url = f"https://cdn.discordapp.com/emojis/{emoji_id}.{ext}"
-            links.append(f"😀 表情 :{name}:: {url}")
+            results.append(f"😀 :{name}:")
+            urls.append(url)
         
         # 提取贴纸
         for sticker in message.stickers:
-            links.append(f"🏷️ 贴纸 {sticker.name}: {sticker.url}")
+            results.append(f"🏷️ {sticker.name}")
+            urls.append(sticker.url)
         
         # 构建响应
-        if links:
-            content = "**找到以下媒体链接：**\n" + "\n".join(links)
+        if urls:
+            content = "**找到以下媒体链接：**\n"
+            for i, (desc, url) in enumerate(zip(results, urls)):
+                content += f"{desc}\n{url}\n```\n{url}\n```\n"
         else:
             content = "❌ 这条消息中没有找到图片、表情或贴纸。"
         
