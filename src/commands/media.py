@@ -90,7 +90,35 @@ def setup_media_commands(client):
             )
             return
         
-        # 自动保存表情和贴纸到收藏
+        # 构建并发送消息到目标频道
+        embed = discord.Embed(
+            title="📎 提取的媒体链接",
+            description=f"来自 {message.author.mention} 的消息",
+            color=discord.Color.green(),
+            url=message.jump_url
+        )
+        embed.add_field(name="原消息链接", value=f"[点击跳转]({message.jump_url})", inline=False)
+        embed.add_field(name="媒体链接", value="\n".join(links[:10]), inline=False)
+        if len(links) > 10:
+            embed.set_footer(text=f"共 {len(links)} 个链接，仅显示前 10 个")
+        
+        try:
+            await channel.send(embed=embed)
+            # 发送纯链接消息
+            await channel.send("\n".join(links))
+            await interaction.response.send_message(
+                f"✅ 已将 {len(links)} 个链接发送到 **#{channel.name}**",
+                ephemeral=True
+            )
+        except discord.Forbidden:
+            await interaction.response.send_message(
+                f"❌ 没有在 **#{channel.name}** 发送消息的权限！",
+                ephemeral=True
+            )
+
+    @client.tree.context_menu(name="收藏表情")
+    async def collect_emoji(interaction: discord.Interaction, message: discord.Message):
+        """收藏消息中的表情和贴纸"""
         saved_emojis = 0
         saved_stickers = 0
         
@@ -110,34 +138,15 @@ def setup_media_commands(client):
             if add_sticker_to_collection(interaction.user.id, str(sticker.id), sticker.name, sticker.url):
                 saved_stickers += 1
         
-        # 构建保存信息
-        save_info = ""
+        # 构建响应
         if saved_emojis > 0 or saved_stickers > 0:
-            save_info = f"\n📥 新保存: {saved_emojis} 个表情, {saved_stickers} 个贴纸"
-        
-        # 构建并发送消息到目标频道
-        embed = discord.Embed(
-            title="📎 提取的媒体链接",
-            description=f"来自 {message.author.mention} 的消息",
-            color=discord.Color.green(),
-            url=message.jump_url
-        )
-        embed.add_field(name="原消息链接", value=f"[点击跳转]({message.jump_url})", inline=False)
-        embed.add_field(name="媒体链接", value="\n".join(links[:10]), inline=False)
-        if len(links) > 10:
-            embed.set_footer(text=f"共 {len(links)} 个链接，仅显示前 10 个")
-        
-        try:
-            await channel.send(embed=embed)
-            # 发送纯链接消息
-            await channel.send("\n".join(links))
             await interaction.response.send_message(
-                f"✅ 已将 {len(links)} 个链接发送到 **#{channel.name}**{save_info}",
+                f"✅ 已收藏: {saved_emojis} 个表情, {saved_stickers} 个贴纸",
                 ephemeral=True
             )
-        except discord.Forbidden:
+        else:
             await interaction.response.send_message(
-                f"❌ 没有在 **#{channel.name}** 发送消息的权限！",
+                "❌ 没有新的表情或贴纸可收藏（可能已收藏过或消息中没有表情/贴纸）。",
                 ephemeral=True
             )
 
